@@ -1,0 +1,15 @@
+[package]
+name = "proxbox"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cmd_lib = "1.6.1"
+dialoguer = { version = "0.11.0", features = [
+    "completion",
+    "fuzzy-matcher",
+    "fuzzy-select",
+] }
+reqwest = "0.11.22"
