@@ -65,7 +65,7 @@ fn debian() -> Result<(), Box<dyn std::error::Error>> {
 
     // run the command until it works, because the LXC might not be ready yet
     loop {
-        match run_cmd!(lxc-attach -n $id -- ps aux) {
+        match run_cmd!(lxc-attach -n $id -- ps aux &> /dev/null) {
             Ok(_) => {
                 run_selected_scripts();
                 break;
