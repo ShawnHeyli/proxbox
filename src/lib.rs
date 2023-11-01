@@ -1,33 +1,47 @@
-use std::path::{Path, PathBuf};
+use cmd_lib::run_cmd;
+use dialoguer::{Input, MultiSelect, Password};
+use reqwest::blocking;
+use reqwest::header::USER_AGENT;
+use serde::Deserialize;
+use std::fmt::Display;
 
-use dialoguer::theme::ColorfulTheme;
-use dialoguer::{FuzzySelect, Input, Password};
-
-pub fn select_file_from_dir<P: AsRef<Path>, S: Into<String>>(dir: P, msg: S) -> PathBuf {
-    // get all files in ../scripts
-    let scripts: Vec<String> = std::fs::read_dir(&dir)
-        .expect("Unable to read directory /scripts")
-        .map(|entry| {
-            let path: PathBuf = entry.unwrap().path();
-            path.file_name().unwrap().to_str().unwrap().to_string()
-        })
-        .collect();
-
-    // Ask user to select a file
-    let choice: usize = FuzzySelect::with_theme(&ColorfulTheme::default())
-        .with_prompt(msg)
-        .default(0)
-        .items(&scripts)
-        .interact()
-        .unwrap();
-
-    // return the selected file
-    Path::new(dir.as_ref()).join(&scripts[choice])
+#[derive(Debug, Deserialize)]
+struct Script {
+    name: String,
+    download_url: String,
 }
 
-pub fn read_select_file_from_dir<P: AsRef<Path>, S: Into<String>>(dir: P, msg: S) -> String {
-    // read the selected file
-    std::fs::read_to_string(select_file_from_dir(dir, msg)).expect("Unable to read file")
+impl Display for Script {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({})", self.name, self.download_url)
+    }
+}
+
+pub fn run_selected_scripts() -> () {
+    let scripts: Vec<Script> = blocking::Client::new()
+        .get("https://api.github.com/repos/ShawnHeyli/proxbox/contents/scripts")
+        .header(
+            USER_AGENT,
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0",
+        )
+        .send()
+        .expect("Unable to download scripts")
+        .json::<Vec<Script>>()
+        .expect("Unable to read scripts");
+
+    let choices = MultiSelect::new()
+        .items(&scripts)
+        .interact()
+        .expect("Unable to select script");
+
+    for choice in choices {
+        let script = blocking::get(&scripts[choice].download_url)
+            .expect("Unable to download script")
+            .text()
+            .expect("Unable to download script");
+
+        run_cmd!(pct exec 105 -- /bin/bash -c "$script").expect("Unable to run script");
+    }
 }
 
 pub fn get_int<S: Into<String>>(msg: S) -> i32 {

@@ -12,4 +12,5 @@ dialoguer = { version = "0.11.0", features = [
     "fuzzy-matcher",
     "fuzzy-select",
 ] }
-reqwest = "0.11.22"
+reqwest = { version = "0.11.22", features = ["blocking", "json"] }
+serde = { version = "1.0.190", features = ["derive"] }
