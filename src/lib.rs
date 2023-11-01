@@ -1,4 +1,4 @@
-use cmd_lib::run_cmd;
+use cmd_lib::{run_cmd, run_fun};
 use dialoguer::{Input, MultiSelect, Password};
 use reqwest::blocking;
 use reqwest::header::USER_AGENT;
@@ -70,4 +70,38 @@ pub fn get_string<S: Into<String>>(msg: S) -> String {
 
 pub fn get_secret<S: Into<String>>(msg: S) -> String {
     Password::new().with_prompt(msg).interact().unwrap()
+}
+
+pub fn get_id<S: Into<String>>(msg: S) -> Result<i32, String> {
+    let id = get_int(msg);
+    if id < 100 || id > 99999 {
+        Err("ID must be between 100 and 99999".to_string())
+    } else {
+        Ok(id)
+    }
+}
+
+pub fn get_password<S: Into<String>>(msg: S) -> Result<String, String> {
+    let password = get_secret(msg);
+    if password.len() < 8 {
+        Err("Password must be at least 8 characters".to_string())
+    } else {
+        Ok(password)
+    }
+}
+
+pub fn get_disk<M: Into<String>, S: Display>(msg: M, storage: S) -> String {
+    let disk = get_int(msg);
+    // TODO handle template storage location (hardcoded to mergerfs here)
+    format!("{storage}:{disk}")
+}
+
+pub fn get_debian_template() -> String {
+    let template = run_fun!(pveam available -section system | grep debian-12 | cut -d " " -f 11)
+        .expect("Unable to find debian template");
+
+    // Download template
+    // TODO handle template storage location (hardcoded to mergerfs here)
+    run_cmd!(pveam download mergerfs $template).expect("Unable to download debian template");
+    return format!("mergerfs:vztmpl/{template}");
 }

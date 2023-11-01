@@ -1,54 +1,15 @@
-use std::thread::sleep;
-use std::{fmt::Display, process::exit, time::Duration};
-
-use cmd_lib::{run_cmd, run_fun};
-use proxbox::{get_int, get_secret, get_string, run_selected_scripts};
+use cmd_lib::run_cmd;
+use proxbox::*;
 
 fn main() {
     debian().expect("Could not create debian LXC");
 }
 
-fn get_id<S: Into<String>>(msg: S) -> i32 {
-    let id = get_int(msg);
-    if id < 100 || id > 99999 {
-        eprintln!("Invalid ID: {}", id);
-        exit(1);
-    } else {
-        return id;
-    }
-}
-
-fn get_password<S: Into<String>>(msg: S) -> String {
-    let password = get_secret(msg);
-    if password.len() < 8 {
-        eprintln!("Password must be at least 8 characters");
-        exit(1);
-    } else {
-        return password;
-    }
-}
-
-fn get_disk<M: Into<String>, S: Display>(msg: M, storage: S) -> String {
-    let disk = get_int(msg);
-    // TODO handle template storage location (hardcoded to mergerfs here)
-    format!("{storage}:{disk}")
-}
-
-fn get_debian_template() -> String {
-    let template = run_fun!(pveam available -section system | grep debian-12 | cut -d " " -f 11)
-        .expect("Unable to find debian template");
-
-    // Download template
-    // TODO handle template storage location (hardcoded to mergerfs here)
-    run_cmd!(pveam download mergerfs $template).expect("Unable to download debian template");
-    return format!("mergerfs:vztmpl/{template}");
-}
-
 fn debian() -> Result<(), Box<dyn std::error::Error>> {
-    let id = get_id("Enter ID:");
+    let id = get_id("Enter ID:").expect("Unable to get ID");
     let template = get_debian_template();
     let hostname = get_string("Enter hostname:");
-    let password = get_password("Enter password:");
+    let password = get_password("Enter password:").expect("Unable to get password");
     let cores = get_int("Enter cores:");
     let memory = get_int("Enter memory:");
     let swap = get_int("Enter swap:");
@@ -63,6 +24,8 @@ fn debian() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("LXC started. Running scripts...");
 
+    run_script_in_lxc(id, "apt update");
+    run_script_in_lxc(id, "apt upgrade -y");
     run_selected_scripts(id);
 
     Ok(())
