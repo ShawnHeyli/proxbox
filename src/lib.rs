@@ -4,6 +4,8 @@ use reqwest::blocking;
 use reqwest::header::USER_AGENT;
 use serde::Deserialize;
 use std::fmt::Display;
+use std::thread::sleep;
+use std::time::Duration;
 
 #[derive(Debug, Deserialize)]
 struct Script {
@@ -17,7 +19,7 @@ impl Display for Script {
     }
 }
 
-pub fn run_selected_scripts() -> () {
+pub fn run_selected_scripts(id: i32) -> () {
     let scripts: Vec<Script> = blocking::Client::new()
         .get("https://api.github.com/repos/ShawnHeyli/proxbox/contents/scripts")
         .header(
@@ -40,7 +42,21 @@ pub fn run_selected_scripts() -> () {
             .text()
             .expect("Unable to download script");
 
-        run_cmd!(pct exec 105 -- /bin/bash -c "$script").expect("Unable to run script");
+        run_script_in_lxc(id, script);
+    }
+}
+
+pub fn run_script_in_lxc<S: ToString>(id: i32, script: S) -> () {
+    // run the command until it works, because the LXC might not be ready yet
+    // lxc-attach and pct exec are the same command, but I'm scared to change it
+    loop {
+        match run_cmd!(lxc-attach -n $id -- ps aux &> /dev/null) {
+            Ok(_) => {
+                run_cmd!(pct exec $id -- bash -c "$script").expect("Unable to run script");
+                break;
+            }
+            Err(_) => sleep(Duration::from_secs(1)),
+        }
     }
 }
 

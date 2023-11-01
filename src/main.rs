@@ -61,18 +61,9 @@ fn debian() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("LXC created. Waiting for LXC to start...");
 
-    println!("LXC started. Running auto_login.sh...");
+    println!("LXC started. Running scripts...");
 
-    // run the command until it works, because the LXC might not be ready yet
-    loop {
-        match run_cmd!(lxc-attach -n $id -- ps aux &> /dev/null) {
-            Ok(_) => {
-                run_selected_scripts();
-                break;
-            }
-            Err(_) => sleep(Duration::from_secs(1)),
-        }
-    }
+    run_selected_scripts(id);
 
     Ok(())
 }
