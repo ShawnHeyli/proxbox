@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 cmd_lib = "1.6.1"
+convert_case = "0.6.0"
 dialoguer = { version = "0.11.0", features = [
     "completion",
     "fuzzy-matcher",
@@ -14,3 +15,4 @@ dialoguer = { version = "0.11.0", features = [
 ] }
 reqwest = { version = "0.11.22", features = ["blocking", "json"] }
 serde = { version = "1.0.190", features = ["derive"] }
+strum = { version = "0.25.0", features = ["derive", "strum_macros"] }
