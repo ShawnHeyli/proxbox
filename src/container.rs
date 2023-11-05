@@ -21,15 +21,15 @@ pub struct Container {
 
 impl Container {
     pub fn new() -> Container {
-        let id = get_id("Enter ID:").expect("Unable to get ID");
-        let template = get_debian_template();
+        let id = Container::get_id("Enter ID:").expect("Unable to get ID");
+        let template = Container::get_debian_template();
         let hostname = get_string("Enter hostname:");
-        let password = get_password("Enter password:").expect("Unable to get password");
+        let password = Container::get_password("Enter password:").expect("Unable to get password");
         let cores = get_int("Enter cores:");
         let memory = get_int("Enter memory:");
         let swap = get_int("Enter swap:");
         let storage = get_string("Enter storage:");
-        let disk = get_disk("Enter disk size (Gib):", storage.clone());
+        let disk = Container::get_disk("Enter disk size (Gib):", storage.clone());
         let net0 = get_string("Enter net:");
         Container {
             id,
@@ -43,6 +43,41 @@ impl Container {
             disk,
             net0,
         }
+    }
+
+    fn get_id<S: Into<String>>(msg: S) -> Result<i32, String> {
+        let id = get_int(msg);
+        if id < 100 || id > 99999 {
+            Err("ID must be between 100 and 99999".to_string())
+        } else {
+            Ok(id)
+        }
+    }
+
+    fn get_password<S: Into<String>>(msg: S) -> Result<String, String> {
+        let password = get_secret(msg);
+        if password.len() < 8 {
+            Err("Password must be at least 8 characters".to_string())
+        } else {
+            Ok(password)
+        }
+    }
+
+    fn get_disk<M: Into<String>, S: Display>(msg: M, storage: S) -> String {
+        let disk = get_int(msg);
+        // TODO handle template storage location (hardcoded to mergerfs here)
+        format!("{storage}:{disk}")
+    }
+
+    fn get_debian_template() -> String {
+        let template =
+            run_fun!(pveam available -section system | grep debian-12 | cut -d " " -f 11)
+                .expect("Unable to find debian template");
+
+        // Download template
+        // TODO handle template storage location (hardcoded to mergerfs here)
+        run_cmd!(pveam download mergerfs $template).expect("Unable to download debian template");
+        return format!("mergerfs:vztmpl/{template}");
     }
 
     // FOR DEBUG PURPOSES ONLY
@@ -106,18 +141,12 @@ impl Container {
     }
 
     pub fn run_script_in_lxc(&self, script: &Script) -> Result<(), String> {
-        let id = self.id;
-        let script: String = script.raw.clone();
-        match run_cmd!(lxc-attach -n $id -- bash -c "curl -s https://raw.githubusercontent.com/brandon1024/proxmox-scripts/main/scripts/$script | bash")
-        {
-            Ok(_) => Ok(()),
-            Err(_) => Err(format!("Unable to run script in the {} LXC", self.id)),
-        }
+        script.run(&self)
     }
 
     pub fn run_composite_script_in_lxc(&self, script: Vec<usize>) -> Result<(), String> {
         for script in script {
-            CompositeScript::iter().nth(script).unwrap().run()?;
+            CompositeScript::iter().nth(script).unwrap().run(&self)?;
         }
         Ok(())
     }
@@ -131,38 +160,4 @@ impl Container {
 
         Ok(scripts)
     }
-}
-
-fn get_id<S: Into<String>>(msg: S) -> Result<i32, String> {
-    let id = get_int(msg);
-    if id < 100 || id > 99999 {
-        Err("ID must be between 100 and 99999".to_string())
-    } else {
-        Ok(id)
-    }
-}
-
-fn get_password<S: Into<String>>(msg: S) -> Result<String, String> {
-    let password = get_secret(msg);
-    if password.len() < 8 {
-        Err("Password must be at least 8 characters".to_string())
-    } else {
-        Ok(password)
-    }
-}
-
-fn get_disk<M: Into<String>, S: Display>(msg: M, storage: S) -> String {
-    let disk = get_int(msg);
-    // TODO handle template storage location (hardcoded to mergerfs here)
-    format!("{storage}:{disk}")
-}
-
-fn get_debian_template() -> String {
-    let template = run_fun!(pveam available -section system | grep debian-12 | cut -d " " -f 11)
-        .expect("Unable to find debian template");
-
-    // Download template
-    // TODO handle template storage location (hardcoded to mergerfs here)
-    run_cmd!(pveam download mergerfs $template).expect("Unable to download debian template");
-    return format!("mergerfs:vztmpl/{template}");
 }
